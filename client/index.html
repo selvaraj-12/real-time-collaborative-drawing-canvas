@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collaborative Drawing Canvas</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="connecting">Connecting…</div>
+      <div id="login-screen" class="hidden">
+        <div class="login-box">
+          <h2>Join the canvas</h2>
+          <p>Enter a display name to start drawing with others.</p>
+          <form id="login-form">
+            <input type="text" id="username-input" placeholder="Your username" maxlength="32" autocomplete="off" />
+            <button type="submit" id="join-btn">Join</button>
+          </form>
+        </div>
+      </div>
+      <div id="main" class="hidden">
+        <header>
+          <h1>Collaborative Canvas</h1>
+          <span id="connection-dot"></span>
+          <span id="connection-text">Connected</span>
+          <div class="header-actions">
+            <button type="button" id="undo-btn">Undo</button>
+            <button type="button" id="redo-btn">Redo</button>
+          </div>
+        </header>
+        <div class="layout">
+          <aside>
+            <section>
+              <label>Tool</label>
+              <div class="tool-buttons">
+                <button type="button" id="tool-brush" class="active">Brush</button>
+                <button type="button" id="tool-eraser">Eraser</button>
+              </div>
+            </section>
+            <section>
+              <label>Color</label>
+              <div id="color-palette"></div>
+            </section>
+            <section>
+              <label>Stroke width</label>
+              <div id="width-buttons"></div>
+            </section>
+            <section class="users-section">
+              <label>Online (<span id="user-count">0</span>)</label>
+              <ul id="user-list"></ul>
+            </section>
+          </aside>
+          <main>
+            <div id="canvas-container">
+              <canvas id="canvas-bg"></canvas>
+              <canvas id="canvas-fg"></canvas>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

@@ -1,20 +1,40 @@
 # Real-Time Collaborative Drawing Canvas
 
-A multi-user drawing app with **real-time sync**, **global undo/redo**, and **user presence**. Built with the **raw HTML Canvas API** (no drawing libraries), React, Node.js, and Socket.io.
+A multi-user drawing app with **real-time sync**, **global undo/redo**, and **user presence**. Built with the **raw HTML Canvas API** (no drawing libraries), TypeScript, Node.js, and Socket.io.
+
+## Folder structure
+
+```
+collaborative-canvas/
+├── client/
+│   ├── index.html       # Entry HTML
+│   ├── style.css        # Styles
+│   ├── canvas.ts        # Canvas drawing logic (raw Canvas API)
+│   ├── websocket.ts     # WebSocket client (Socket.io)
+│   └── main.ts          # App startup, DOM, wiring
+├── server/
+│   ├── server.js        # Express + Socket.io server
+│   ├── rooms.js         # Room handling (users, per-room state)
+│   └── drawing-state.js # Canvas state (stroke history, undo/redo)
+├── package.json
+├── README.md
+└── ARCHITECTURE.md      # Mandatory architecture doc
+```
 
 ## Features
 
+- **Username login**: Enter a display name to join; your name is shown to others and on cursors.
 - **Drawing tools**: Brush, Eraser, multiple colors, adjustable stroke width
 - **Real-time synchronization**: See others’ strokes **while they draw** (batched progress + final commit)
 - **User indicators**: Other users’ cursors and names on the canvas; cursor positions scale across different window sizes
-- **Conflict handling**: Strokes are ordered; overlapping draws from multiple users appear as separate strokes in sequence (no pixel-level conflict)
-- **Global undo/redo**: One shared history; any user can undo/redo any stroke so everyone sees the same canvas state
+- **Conflict handling**: Strokes are ordered; overlapping draws from multiple users appear as separate strokes in sequence
+- **Global undo/redo**: One shared history; any user can undo/redo any stroke
 - **User management**: Online user list with a unique color per user
 
-## Tech Stack
+## Tech stack
 
-- **Frontend**: React 18, TypeScript, Vite, raw Canvas API
-- **Backend**: Node.js, Express, Socket.io
+- **Client**: TypeScript, Vite, raw Canvas API, Socket.io-client
+- **Server**: Node.js, Express, Socket.io
 
 ## Run locally
 
@@ -28,25 +48,4 @@ npm run dev
 
 Open multiple tabs/windows to test collaboration.
 
-## Architecture
-
-### Canvas
-
-- **Background layer**: Committed strokes only; redrawn when history or canvas size changes.
-- **Foreground layer**: Live strokes (yours + others’) and remote cursors; redrawn on input and socket updates.
-- **Drawing**: Smooth paths via `quadraticCurveTo`; points batched and sent every 5 points and ~80 ms for real-time feel.
-
-### Real-time sync
-
-- **Commit**: On pointer up, the full stroke is sent as `stroke_commit`; server appends to history and broadcasts; all clients add to local history.
-- **Progress**: While drawing, batched points are sent as `stroke_progress` with canvas dimensions; others scale and draw the same path live; cleared on commit.
-- **Cursors**: Throttled `cursor` events with `(x, y, canvasWidth, canvasHeight)` so receivers can scale to their own canvas size.
-
-### State and global undo/redo
-
-- **Server**: Single source of truth: `strokeHistory[]` and `redoStack[]`. New stroke → push to history, clear redo. Undo → pop from history, push to redo. Redo → pop from redo, push to history. All changes broadcast.
-- **Clients**: Apply the same updates from events; local redo stack is kept in sync so the Redo button reflects availability. Everyone ends up with the same ordered stroke list and canvas.
-
-### Conflict handling
-
-- No OT/CRDT: strokes are immutable and totally ordered. Concurrent draws become multiple strokes in sequence; overlapping area is simply “last stroke on top,” which is consistent for all users.
+See **ARCHITECTURE.md** for detailed architecture and data flow.
