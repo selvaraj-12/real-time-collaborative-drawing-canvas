@@ -1,107 +1,60 @@
-/**
- * Express + WebSocket server. Wires Socket.io to rooms and drawing-state.
- */
-
-const express = require('express');
-const { createServer } = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-const { joinRoom, leaveRoom, setUsername, getRoomUsers } = require('./rooms.js');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const { getRoom } = require("./rooms");
 
 const app = express();
-const httpServer = createServer(app);
+const server = http.createServer(app);
+const io = new Server(server);
 
-const io = new Server(httpServer, {
-  cors: { origin: '*' },
-  pingTimeout: 60000,
-  pingInterval: 25000,
-});
+app.use(express.static("client"));
 
-const DEFAULT_ROOM = 'default';
+io.on("connection", (socket) => {
+  let roomId = "default";
 
-io.on('connection', (socket) => {
-  const { room, userId, color, name } = joinRoom(socket.id, DEFAULT_ROOM);
-  const drawingState = room.drawingState;
+  socket.on("JOIN_ROOM", ({ room, username }) => {
+    roomId = room || "default";
+    socket.join(roomId);
 
-  socket.emit('init', {
-    userId,
-    color,
-    users: getRoomUsers(DEFAULT_ROOM),
-    strokeHistory: drawingState.getState().strokeHistory,
+    const roomData = getRoom(roomId);
+    roomData.users[socket.id] = username;
+
+    socket.emit("STATE_SYNC", roomData.state.getState());
+    io.to(roomId).emit("USERS_UPDATE", roomData.users);
   });
 
-  socket.broadcast.emit('user_joined', {
-    id: userId,
-    color,
-    name,
-    socketId: socket.id,
+  socket.on("DRAW_START", (cmd) => {
+    const roomData = getRoom(roomId);
+    roomData.state.add(cmd);
+    socket.to(roomId).emit("DRAW_START", cmd);
   });
 
-  socket.on('stroke_commit', (stroke) => {
-    const committed = drawingState.addStroke(stroke, userId);
-    io.emit('stroke_commit', committed);
+  socket.on("DRAW_PROGRESS", (data) => {
+    socket.to(roomId).emit("DRAW_PROGRESS", data);
   });
 
-  socket.on('stroke_progress', (data) => {
-    const user = room.users.get(socket.id);
-    socket.broadcast.emit('stroke_progress', {
-      ...data,
-      userId,
-      color: user ? user.color : color,
-    });
-  });
-
-  socket.on('set_username', (newName) => {
-    const user = setUsername(socket.id, newName, DEFAULT_ROOM);
-    if (user) {
-      io.emit('user_updated', {
-        socketId: socket.id,
-        userId: user.id,
-        name: user.name,
-      });
+  socket.on("UNDO", () => {
+    const roomData = getRoom(roomId);
+    if (roomData.state.undo()) {
+      io.to(roomId).emit("UNDO_APPLIED");
     }
   });
 
-  socket.on('cursor', (pos) => {
-    const user = room.users.get(socket.id);
-    socket.broadcast.emit('cursor', {
-      userId,
-      color,
-      name: user ? user.name : name,
-      socketId: socket.id,
-      ...pos,
-    });
-  });
-
-  socket.on('undo', () => {
-    const removed = drawingState.undo();
-    if (removed) {
-      io.emit('undo', { strokeId: removed.id, undoneBy: userId });
+  socket.on("REDO", () => {
+    const roomData = getRoom(roomId);
+    const cmd = roomData.state.redo();
+    if (cmd) {
+      io.to(roomId).emit("REDO_APPLIED", cmd);
     }
   });
 
-  socket.on('redo', () => {
-    const restored = drawingState.redo();
-    if (restored) {
-      io.emit('redo', { stroke: restored });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    const user = leaveRoom(socket.id, DEFAULT_ROOM);
-    if (user) {
-      io.emit('user_left', { socketId: socket.id, userId: user.id });
-    }
+  socket.on("disconnect", () => {
+    const roomData = getRoom(roomId);
+    delete roomData.users[socket.id];
+    io.to(roomId).emit("USERS_UPDATE", roomData.users);
   });
 });
 
-app.use(express.static(path.join(__dirname, '..', 'dist')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
-});
-
-const PORT = process.env.PORT || 3000;
-
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+server.listen(3000, () =>
+  console.log("Server running at http://localhost:3000")
+);
